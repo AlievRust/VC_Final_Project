@@ -1,0 +1,21 @@
+# Project-scoped Codex multi-agent defaults.
+# The primary model is intentionally not pinned here:
+# use GPT-6 Sol Medium for normal STANDARD orchestration,
+# GPT-6 Sol High for DEEP work,
+# and Astra Low/Medium only for exceptional cross-system ambiguity.
+
+[agents]
+enabled = true
+
+# Safety cap for spawned threads; the primary thread is not counted.
+# Normal tasks should use fewer agents.
+max_concurrent_threads_per_session = 4
+
+# Fallback for unnamed or ad-hoc subagents.
+# Named agents in .codex/agents/ override these values.
+default_subagent_model = "gpt-6-luna"
+default_subagent_reasoning_effort = "high"
+
+# Keep interrupted-agent events visible to the orchestrator.
+interrupt_message = true
+
