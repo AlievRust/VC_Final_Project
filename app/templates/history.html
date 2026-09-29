@@ -1,3 +1,10 @@
 {% extends "base.html" %}
 {% block title %}История / аудит · Система знаний команды{% endblock %}
-{% block content %}<section class="heading"><div><p class="eyebrow">CP5</p><h1>История / аудит</h1><p>История вопросов и фильтр ручной проверки появятся после внедрения ответов с источниками.</p></div></section><section class="card"><p class="empty">Пока ответы не формируются и история вопросов пуста.</p></section>{% endblock %}
+{% block content %}
+<section class="heading"><div><p class="eyebrow">Последние запросы</p><h1>История / аудит</h1><p>Ответы, источники, причины ручной проверки и события сервиса хранятся в PostgreSQL.</p></div></section>
+<div class="filter"><a href="/history" {% if not only_review %}aria-current="page"{% endif %}>Все вопросы</a><a href="/history?needs_review=true" {% if only_review %}aria-current="page"{% endif %}>Требуют проверки</a></div>
+<section class="card"><h2>Вопросы</h2>
+{% if runs %}{% for run in runs %}<article class="history-item"><div class="history-meta"><time>{{ run.created_at.strftime('%d.%m.%Y %H:%M') }}</time><span class="status {% if run.needs_review %}status-review{% else %}status-ready{% endif %}">{% if run.needs_review %}Нужна проверка{% else %}Подтверждён{% endif %}</span></div><h3>{{ run.question }}</h3><p>{{ run.answer }}</p>{% if run.review_reason %}<p class="error">Причина: {{ run.review_reason }}</p>{% endif %}{% if run.sources %}<details><summary>Источники и цитаты ({{ run.sources|length }})</summary><ul class="source-list">{% for source in run.sources %}<li>{{ source.title }} · фрагмент #{{ source.snippet_id }}<blockquote>{{ source.quote }}</blockquote></li>{% endfor %}</ul></details>{% endif %}<details><summary>Диагностика retrieval/LLM</summary><pre>{{ run.diagnostics }}</pre></details></article>{% endfor %}
+{% else %}<p class="empty">Запросов с таким статусом пока нет.</p>{% endif %}</section>
+<section class="card"><h2>Аудит операций</h2>{% if audit %}<ul class="audit-list">{% for event in audit %}<li><time>{{ event.created_at.strftime('%d.%m.%Y %H:%M') }}</time><strong>{{ event.action }}</strong><span>№{{ event.entity_id }}</span><small>{{ event.details }}</small></li>{% endfor %}</ul>{% else %}<p class="empty">Событий пока нет.</p>{% endif %}</section>
+{% endblock %}

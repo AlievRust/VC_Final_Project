@@ -1,4 +1,4 @@
-"""FastAPI routes для документов и прозрачной диагностики поиска CP3."""
+"""FastAPI routes для документов, вопросов, истории и диагностики поиска."""
 
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,10 +10,12 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
+from app.answers import AnswerGenerationError, AnswerService, YandexAnswerModel
 from app.config import Settings
 from app.db import create_session_factory
 from app.documents import DocumentService, DocumentValidationError
 from app.embeddings import EmbeddingError, YandexEmbeddings
+from app.history import HistoryService, audit_data, qa_data
 from app.search import BM25Index, retrieve
 
 ROOT = Path(__file__).parent
@@ -22,6 +24,9 @@ sessions = create_session_factory(settings)
 index = BM25Index()
 embeddings = YandexEmbeddings(settings)
 documents = DocumentService(sessions, settings, embeddings, index)
+history = HistoryService(sessions)
+answer_model = YandexAnswerModel(settings) if settings.yandex_api_key else None
+answers = AnswerService(sessions, index, embeddings, answer_model, settings, history)
 templates = Jinja2Templates(directory=str(ROOT / "templates"))
 
 
@@ -53,6 +58,13 @@ async def embedding_error_handler(_: Request, __: EmbeddingError):
     from fastapi.responses import JSONResponse
 
     return JSONResponse(status_code=502, content={"detail": "Сервис embeddings недоступен; проверьте настройки Yandex AI Studio"})
+
+
+@app.exception_handler(AnswerGenerationError)
+async def answer_error_handler(_: Request, __: AnswerGenerationError):
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(status_code=502, content={"detail": "Не удалось получить структурированный ответ модели"})
 
 
 @app.get("/health")
@@ -91,7 +103,30 @@ def delete_document(document_id: int) -> None:
 
 @app.post("/kb/retrieve")
 def retrieve_api(data: RetrievalInput) -> dict:
-    return retrieve(data.question.strip(), sessions, index, embeddings, settings)
+    return retrieve(_question(data.question), sessions, index, embeddings, settings)
+
+
+def _question(value: str) -> str:
+    question = value.strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="Введите вопрос")
+    return question
+
+
+@app.post("/kb/ask")
+@app.post("/ai/answer_with_sources")
+def ask_api(data: RetrievalInput) -> dict:
+    return answers.ask(_question(data.question))
+
+
+@app.get("/kb/history")
+def history_api(needs_review: bool | None = None) -> list[dict]:
+    return [qa_data(run) for run in history.questions(needs_review)]
+
+
+@app.get("/kb/audit")
+def audit_api() -> list[dict]:
+    return [audit_data(run) for run in history.audit()]
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -142,20 +177,20 @@ def delete_document_form(request: Request, document_id: int):
 
 @app.get("/questions", response_class=HTMLResponse)
 def questions_page(request: Request):
-    return templates.TemplateResponse(request, "questions.html", {"result": None, "error": None})
+    return templates.TemplateResponse(request, "questions.html", {"result": None, "error": None, "question": ""})
 
 
 @app.post("/questions", response_class=HTMLResponse)
 def questions_form(request: Request, question: str = Form(...)):
     if not question.strip():
-        return templates.TemplateResponse(request, "questions.html", {"result": None, "error": "Введите вопрос"}, status_code=422)
+        return templates.TemplateResponse(request, "questions.html", {"result": None, "error": "Введите вопрос", "question": question}, status_code=422)
     try:
-        result = retrieve(question.strip(), sessions, index, embeddings, settings)
-        return templates.TemplateResponse(request, "questions.html", {"result": result, "error": None})
-    except EmbeddingError as exc:
-        return templates.TemplateResponse(request, "questions.html", {"result": None, "error": str(exc)}, status_code=502)
+        result = answers.ask(question.strip())
+        return templates.TemplateResponse(request, "questions.html", {"result": result, "error": None, "question": question})
+    except (EmbeddingError, AnswerGenerationError):
+        return templates.TemplateResponse(request, "questions.html", {"result": None, "error": "Сервис моделей временно недоступен", "question": question}, status_code=502)
 
 
 @app.get("/history", response_class=HTMLResponse)
-def history_page(request: Request):
-    return templates.TemplateResponse(request, "history.html", {})
+def history_page(request: Request, needs_review: bool = False):
+    return templates.TemplateResponse(request, "history.html", {"runs": history.questions(True if needs_review else None), "audit": history.audit(), "only_review": needs_review})

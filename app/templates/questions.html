@@ -1,7 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Вопросы · Система знаний команды{% endblock %}
 {% block content %}
-<section class="heading"><div><p class="eyebrow">Проверка поиска · CP3</p><h1>Вопросы</h1><p>Пока доступны результаты retrieval и их диагностика. Ответы с источниками появятся после согласования политики evidence.</p></div></section>
-<section class="card"><form action="/questions" method="post"><label for="question">Вопрос по базе знаний</label><textarea id="question" name="question" rows="3" required maxlength="2000" placeholder="Сформулируйте один самостоятельный вопрос"></textarea><button type="submit">Найти фрагменты</button></form>{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}</section>
-{% if result %}<section class="card"><h2>Результаты RRF</h2><p class="hint">{{ result.note }}</p>{% if result.results %}<ol class="results">{% for row in result.results %}<li><strong>{{ row.title }}</strong> · фрагмент #{{ row.snippet_id }}<p>{{ row.text }}</p><small>RRF: {{ '%.5f'|format(row.rrf_score) }}</small></li>{% endfor %}</ol>{% else %}<p class="empty">Фрагменты не найдены.</p>{% endif %}<details><summary>Диагностика semantic и BM25</summary><h3>Semantic</h3><pre>{{ result.semantic }}</pre><h3>BM25</h3><pre>{{ result.lexical }}</pre></details></section>{% endif %}
+<section class="heading"><div><p class="eyebrow">Ответ по базе знаний</p><h1>Вопросы</h1><p>Задайте один самостоятельный вопрос. Ответ сопровождается фрагментами документов, на которых он основан.</p></div></section>
+<section class="card"><form action="/questions" method="post"><label for="question">Вопрос по базе знаний</label><textarea id="question" name="question" rows="3" required maxlength="2000" placeholder="Сформулируйте один самостоятельный вопрос">{{ question }}</textarea><button type="submit">Получить ответ</button></form>{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}</section>
+{% if result %}
+<section class="card">
+  <p class="status {% if result.needs_review %}status-review{% else %}status-ready{% endif %}">{% if result.needs_review %}Нужна ручная проверка{% else %}Ответ подтверждён{% endif %}</p>
+  <h2>Ответ</h2><p class="answer">{{ result.answer }}</p>
+  {% if result.review_reason %}<p class="error">Причина: {{ result.review_reason }}</p>{% endif %}
+  {% if result.sources %}<h2>Источники и цитаты</h2><ul class="source-list">{% for source in result.sources %}<li><a href="/documents/{{ source.document_id }}">{{ source.title }}</a> · фрагмент #{{ source.snippet_id }}<blockquote>{{ source.quote }}</blockquote></li>{% endfor %}</ul>{% endif %}
+  <details><summary>Диагностика поиска и модели</summary><p>Качество evidence: {{ result.diagnostics.retrieval.level }}. Cosine distance: {{ result.diagnostics.retrieval.cosine_distance if result.diagnostics.retrieval.cosine_distance is not none else '—' }}. BM25: {{ result.diagnostics.retrieval.bm25_score if result.diagnostics.retrieval.bm25_score is not none else '—' }}.</p>{% if result.diagnostics.model %}<p>Уверенность модели: {{ result.diagnostics.model.confidence }}.</p>{% endif %}<pre>{{ result.diagnostics }}</pre></details>
+</section>
+{% endif %}
 {% endblock %}
