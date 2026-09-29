@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Система знаний команды{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/documents">Система знаний команды</a>
+    <nav aria-label="Разделы">
+      <a href="/documents" {% if request.url.path.startswith('/documents') %}aria-current="page"{% endif %}>Документы</a>
+      <a href="/questions" {% if request.url.path == '/questions' %}aria-current="page"{% endif %}>Вопросы</a>
+      <a href="/history" {% if request.url.path == '/history' %}aria-current="page"{% endif %}>История / аудит</a>
+    </nav>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  <footer>Учебный проект · данные сохраняются в PostgreSQL</footer>
+</body>
+</html>

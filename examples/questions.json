@@ -1,0 +1,12 @@
+[
+  {"question": "Кто создаёт заявку на доступ к репозиторию?", "answerable": true},
+  {"question": "Когда наставник проводит вводную встречу?", "answerable": true},
+  {"question": "За сколько дней нужно подать заявку на отпуск?", "answerable": true},
+  {"question": "Сколько времени руководитель рассматривает заявку на отпуск?", "answerable": true},
+  {"question": "Когда дежурный сообщает о P1?", "answerable": true},
+  {"question": "В какие дни и во сколько проводят плановые релизы?", "answerable": true},
+  {"question": "По какому номеру звонить при срочной проблеме?", "answerable": true},
+  {"question": "Какой бюджет у команды на обучение?", "answerable": false},
+  {"question": "Кто утверждает командировки?", "answerable": false},
+  {"question": "Каков срок хранения резервных копий?", "answerable": false}
+]

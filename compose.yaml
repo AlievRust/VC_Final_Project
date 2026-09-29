@@ -1,0 +1,46 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: kb
+      POSTGRES_USER: kb
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-kb-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kb -d kb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [private]
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+psycopg://kb:${POSTGRES_PASSWORD:-local-kb-password}@db:5432/kb
+      YANDEX_FOLDER_ID: ${YANDEX_FOLDER_ID:-}
+      YANDEX_API_KEY: ${YANDEX_API_KEY:-}
+      YANDEX_EMBEDDINGS_URL: ${YANDEX_EMBEDDINGS_URL:-https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding}
+      YANDEX_DOC_EMBEDDING_MODEL: ${YANDEX_DOC_EMBEDDING_MODEL:-}
+      YANDEX_QUERY_EMBEDDING_MODEL: ${YANDEX_QUERY_EMBEDDING_MODEL:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [private, edge]
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on: [api]
+    networks: [edge]
+
+networks:
+  private:
+    internal: true
+  edge: {}
+
+volumes:
+  postgres_data:

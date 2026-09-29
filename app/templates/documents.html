@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Документы · Система знаний команды{% endblock %}
+{% block content %}
+<section class="heading"><div><p class="eyebrow">База знаний</p><h1>Документы</h1><p>Добавьте текст или файл .txt / .md. Индексация выполняется сразу.</p></div><span class="count">{{ documents|length }} документов</span></section>
+<div class="columns">
+  <section class="card">
+    <h2>Добавить документ</h2>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    <form action="/documents" method="post" enctype="multipart/form-data">
+      <label for="title">Название</label><input id="title" name="title" maxlength="255" placeholder="Например, Регламент отпусков">
+      <label for="text_value">Текст документа</label><textarea id="text_value" name="text_value" rows="8" placeholder="Вставьте текст сюда..."></textarea>
+      <p class="hint">Можно выбрать файл вместо текста. Кодировка файла — UTF-8.</p>
+      <label for="file">Файл</label><input id="file" name="file" type="file" accept=".txt,.md,text/plain,text/markdown">
+      <button type="submit">Добавить и индексировать</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Сохранённые документы</h2>
+    {% if documents %}
+      <ul class="document-list">{% for document in documents %}<li><a href="/documents/{{ document.id }}">{{ document.title }}</a><small>{{ document.created_at.strftime('%d.%m.%Y %H:%M') }}</small></li>{% endfor %}</ul>
+    {% else %}<p class="empty">Документов пока нет. Добавьте первый материал для поиска.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

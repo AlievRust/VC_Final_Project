@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}{{ document.title }} · Система знаний команды{% endblock %}
+{% block content %}
+<p><a href="/documents">← К списку документов</a></p>
+<section class="card"><p class="eyebrow">Документ №{{ document.id }}</p><h1>{{ document.title }}</h1><p class="hint">Добавлен {{ document.created_at.strftime('%d.%m.%Y %H:%M') }}</p><pre class="document-text">{{ document.text }}</pre><form action="/documents/{{ document.id }}/delete" method="post"><button class="danger" type="submit">Удалить документ</button></form></section>
+{% endblock %}

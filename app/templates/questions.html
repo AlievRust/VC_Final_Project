@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Вопросы · Система знаний команды{% endblock %}
+{% block content %}
+<section class="heading"><div><p class="eyebrow">Проверка поиска · CP3</p><h1>Вопросы</h1><p>Пока доступны результаты retrieval и их диагностика. Ответы с источниками появятся после согласования политики evidence.</p></div></section>
+<section class="card"><form action="/questions" method="post"><label for="question">Вопрос по базе знаний</label><textarea id="question" name="question" rows="3" required maxlength="2000" placeholder="Сформулируйте один самостоятельный вопрос"></textarea><button type="submit">Найти фрагменты</button></form>{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}</section>
+{% if result %}<section class="card"><h2>Результаты RRF</h2><p class="hint">{{ result.note }}</p>{% if result.results %}<ol class="results">{% for row in result.results %}<li><strong>{{ row.title }}</strong> · фрагмент #{{ row.snippet_id }}<p>{{ row.text }}</p><small>RRF: {{ '%.5f'|format(row.rrf_score) }}</small></li>{% endfor %}</ol>{% else %}<p class="empty">Фрагменты не найдены.</p>{% endif %}<details><summary>Диагностика semantic и BM25</summary><h3>Semantic</h3><pre>{{ result.semantic }}</pre><h3>BM25</h3><pre>{{ result.lexical }}</pre></details></section>{% endif %}
+{% endblock %}
