@@ -35,6 +35,14 @@ class HistoryService:
         with self.sessions() as session:
             return list(session.scalars(query).all())
 
+    def export_questions(self) -> list[dict[str, Any]]:
+        """Экспортирует всю историю вопросов и фиксирует скачивание в аудите."""
+        with self.sessions.begin() as session:
+            runs = session.scalars(select(QaRun).order_by(QaRun.created_at.desc(), QaRun.id.desc())).all()
+            exported = [qa_data(run) for run in runs]
+            session.add(AuditRun(action="history.exported", entity_id=None, details={"count": len(exported)}))
+            return exported
+
     def audit(self, limit: int = 50) -> list[AuditRun]:
         with self.sessions() as session:
             return list(session.scalars(select(AuditRun).order_by(AuditRun.created_at.desc(), AuditRun.id.desc()).limit(limit)).all())

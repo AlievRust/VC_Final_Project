@@ -1,0 +1,10 @@
+{"id": 1, "question": "Кто создаёт заявку на доступ к репозиторию?", "expected_needs_review": false, "expected_sources": ["01_onboarding"]}
+{"id": 2, "question": "Когда наставник проводит вводную встречу?", "expected_needs_review": false, "expected_sources": ["01_onboarding"]}
+{"id": 3, "question": "За сколько дней нужно подать заявку на отпуск?", "expected_needs_review": false, "expected_sources": ["02_leave"]}
+{"id": 4, "question": "Сколько времени руководитель рассматривает заявку на отпуск?", "expected_needs_review": false, "expected_sources": ["02_leave"]}
+{"id": 5, "question": "Когда дежурный сообщает о P1?", "expected_needs_review": false, "expected_sources": ["03_incidents"]}
+{"id": 6, "question": "В какие дни и во сколько проводят плановые релизы?", "expected_needs_review": false, "expected_sources": ["04_releases"]}
+{"id": 7, "question": "По какому номеру звонить при срочной проблеме?", "expected_needs_review": false, "expected_sources": ["05_support"]}
+{"id": 8, "question": "Какой бюджет у команды на обучение?", "expected_needs_review": true, "expected_sources": []}
+{"id": 9, "question": "Кто утверждает командировки?", "expected_needs_review": true, "expected_sources": []}
+{"id": 10, "question": "Каков срок хранения резервных копий?", "expected_needs_review": true, "expected_sources": []}

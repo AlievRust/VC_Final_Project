@@ -29,7 +29,7 @@ def main() -> None:
     parser.add_argument("--base-url", default="http://api:8000")
     args = parser.parse_args()
     base_url = args.base_url.rstrip("/")
-    cases = json.loads((ROOT / "examples" / "questions.json").read_text(encoding="utf-8"))
+    cases = [json.loads(line) for line in (ROOT / "tests_data" / "kb_questions.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     documents = get(base_url, "/kb/documents")
     if len(documents) != 5 or len(cases) != 10:
         raise SystemExit(f"Ожидались 5 документов и 10 вопросов; найдено {len(documents)} и {len(cases)}")
@@ -39,7 +39,16 @@ def main() -> None:
     for number, case in enumerate(cases, 1):
         result = ask(base_url, case["question"])
         run_ids.append(result["run_id"])
-        accepted = bool(result["sources"]) and not result["needs_review"] if case["answerable"] else result["needs_review"] and bool(result["review_reason"])
+        actual_sources = {row["title"] for row in result["sources"]}
+        expected_sources = set(case["expected_sources"])
+        accepted = (
+            result["needs_review"] == case["expected_needs_review"]
+            and (
+                not actual_sources and bool(result["review_reason"])
+                if case["expected_needs_review"]
+                else expected_sources <= actual_sources and bool(result["answer"])
+            )
+        )
         passed += bool(accepted)
         print(f"{number:02d} {'PASS' if accepted else 'FAIL'} · {case['question']}")
         print(f"   Ответ: {result['answer']}")
@@ -49,14 +58,17 @@ def main() -> None:
 
     history = get(base_url, "/kb/history")
     review = get(base_url, "/kb/history?needs_review=true")
+    exported = get(base_url, "/kb/history/export")
     audit = get(base_url, "/kb/audit")
     history_ids = {row["id"] for row in history}
     review_ids = {row["id"] for row in review}
     audit_ids = {row["entity_id"] for row in audit if row["action"] == "question.asked"}
-    persisted = set(run_ids) <= history_ids and set(run_ids) <= audit_ids
-    expected_review_ids = {run_ids[i] for i, case in enumerate(cases) if not case["answerable"]}
+    export_ids = {row["id"] for row in exported}
+    export_logged = any(row["action"] == "history.exported" and row["details"].get("count") == len(exported) for row in audit)
+    persisted = set(run_ids) <= history_ids and set(run_ids) <= audit_ids and set(run_ids) <= export_ids and export_logged
+    expected_review_ids = {run_ids[i] for i, case in enumerate(cases) if case["expected_needs_review"]}
     persisted = persisted and expected_review_ids <= review_ids
-    print(f"Итог: {passed}/10 по статусам и источникам; история/аудит={'PASS' if persisted else 'FAIL'}")
+    print(f"Итог: {passed}/10 по статусам и источникам; история/аудит/экспорт={'PASS' if persisted else 'FAIL'}")
     if passed != 10 or not persisted:
         raise SystemExit(1)
 

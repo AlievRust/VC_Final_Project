@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -122,6 +122,14 @@ def ask_api(data: RetrievalInput) -> dict:
 @app.get("/kb/history")
 def history_api(needs_review: bool | None = None) -> list[dict]:
     return [qa_data(run) for run in history.questions(needs_review)]
+
+
+@app.get("/kb/history/export")
+def export_history_api() -> JSONResponse:
+    return JSONResponse(
+        content=history.export_questions(),
+        headers={"Content-Disposition": 'attachment; filename="qa_history.json"'},
+    )
 
 
 @app.get("/kb/audit")
