@@ -3,7 +3,7 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from app.answers import AnswerDraft, AnswerService, decide_answer
+from app.answers import AnswerDraft, AnswerService, _has_explicit_document_versions, decide_answer
 from app.config import Settings
 from app.evidence import evaluate_evidence
 
@@ -16,6 +16,30 @@ def retrieval(distance: float = 0.7, bm25: float | None = 3.0) -> dict:
         "lexical": [{**chunk, "bm25_score": bm25, "rank": 1}] if bm25 is not None else [],
         "results": [{**chunk, "rrf_score": 0.03}],
     }
+
+
+class DocumentVersionRouterTests(unittest.TestCase):
+    def test_active_and_archive(self) -> None:
+        chunks = [
+            {"title": "Доступ к репозиториям", "text": "Действующая редакция с 1 июля 2026 года."},
+            {"title": "Архив: правила доступа 2024 года", "text": "Документ выведен из действия."},
+        ]
+        self.assertTrue(_has_explicit_document_versions(chunks))
+
+    def test_only_active(self) -> None:
+        chunks = [{"title": "Доступ к репозиториям", "text": "Действующая редакция с 1 июля 2026 года."}]
+        self.assertFalse(_has_explicit_document_versions(chunks))
+
+    def test_only_archive(self) -> None:
+        chunks = [{"title": "Архив: правила доступа 2024 года", "text": "Документ выведен из действия."}]
+        self.assertFalse(_has_explicit_document_versions(chunks))
+
+    def test_ordinary_documents(self) -> None:
+        chunks = [
+            {"title": "Отпуска", "text": "Заявку подают за 14 дней."},
+            {"title": "Релизы", "text": "Релизы проходят по вторникам."},
+        ]
+        self.assertFalse(_has_explicit_document_versions(chunks))
 
 
 class EvidenceTests(unittest.TestCase):
