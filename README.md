@@ -12,6 +12,98 @@
 
 Пороги `EVIDENCE_MAX_COSINE_DISTANCE=0.78`, `EVIDENCE_MIN_BM25_SCORE=2.0` и `LLM_MIN_CONFIDENCE=0.7` заданы в `.env` и передаются контейнеру через Compose. Параметры chunking, top-K, RRF и модели тоже настраиваются там; доступные имена приведены в `.env.example`. После изменения `.env` выполните `docker compose up -d`, чтобы пересоздать API. Пороговая политика утверждена для учебного набора из пяти документов; при другом корпусе её следует перепроверить.
 
+## Развёртывание на VPS с HTTPS
+
+> **В MVP не предусмотрены аутентификация и авторизация. Размещение сервиса в сети — риск.** Любой пользователь, имеющий доступ к адресу сервиса, сможет читать, добавлять и удалять документы, просматривать историю и аудит, скачивать историю и отправлять запросы к платной Yandex-модели. HTTPS шифрует соединение, но не ограничивает доступ. Используйте вымышленные данные для демонстрации; для рабочих данных сначала организуйте внешний контроль доступа, например VPN или шлюз с авторизацией. Пример ниже сам по себе такого контроля не добавляет.
+
+Инструкция рассчитана на Linux VPS с Ubuntu и выполняется в Bash на сервере. Используется Caddy из существующего Compose-стека; устанавливать второй Caddy на хост не требуется. Дополнительные файлы ниже оператор создаёт на VPS — в репозитории их нет.
+
+### Подготовка сервера
+
+1. Установите Docker Engine и Compose plugin по [официальной инструкции Docker для Ubuntu](https://docs.docker.com/engine/install/ubuntu/). Убедитесь, что `docker compose version` выполняется от учётной записи оператора и Docker запускается при загрузке сервера.
+2. Выберите домен, например `kb.example.com`, и направьте его DNS-запись `A` на публичный IPv4 VPS. Если есть запись `AAAA`, она должна указывать на работающий IPv6 этого же сервера.
+3. Разрешите входящие TCP-порты `80` и `443` в сетевых правилах провайдера и на сервере, сохранив доступ оператора по SSH. Эти порты должны быть свободны: другой веб-сервер не должен занимать их. API `8000` и PostgreSQL `5432` публиковать не нужно. Для выпуска сертификата нужен исходящий доступ Caddy к центру сертификации, для работы приложения — доступ API к Yandex AI Studio.
+4. Загрузите исходники в отдельный каталог сервера и перейдите в него. Создайте серверный `.env`:
+
+```bash
+cp .env.example .env
+chmod 600 .env
+nano .env
+```
+
+Задайте реальные `YANDEX_FOLDER_ID` и `YANDEX_API_KEY`, а также отдельный случайный `POSTGRES_PASSWORD`, раскомментировав строку. Для пароля используйте длинную строку из букв и цифр: Compose вставляет его в URL подключения без дополнительного кодирования. Настройки retrieval и модели перенесите из принятой конфигурации проекта. Не включайте `.env` в Git и публичные материалы.
+
+### Caddy и Compose для VPS
+
+Создайте `Caddyfile.vps` в корне проекта. Замените `kb.example.com` на свой домен, без префикса `http://`:
+
+```bash
+cat > Caddyfile.vps <<'EOF'
+kb.example.com {
+    reverse_proxy api:8000
+}
+EOF
+```
+
+При корректном DNS и доступных портах Caddy автоматически получает и обновляет TLS-сертификат и перенаправляет HTTP на HTTPS. Для этого хранилище сертификатов должно сохраняться между пересозданиями контейнера. Условия описаны в [документации Caddy по automatic HTTPS](https://caddyserver.com/docs/automatic-https); проксирование — в [руководстве Caddy по reverse proxy](https://caddyserver.com/docs/quick-starts/reverse-proxy).
+
+Создайте `compose.vps.yaml` рядом с `compose.yaml`:
+
+```bash
+cat > compose.vps.yaml <<'EOF'
+services:
+  db:
+    restart: unless-stopped
+  api:
+    restart: unless-stopped
+  caddy:
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    volumes:
+      - ./Caddyfile.vps:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
+EOF
+```
+
+Этот дополнительный файл сохраняет порт `80` из базовой конфигурации и добавляет `443`. Монтирование `Caddyfile.vps` заменяет локальный Caddyfile по тому же пути в контейнере; API и БД остаются без внешних портов. Политика `restart` позволяет контейнерам запускаться после перезагрузки VPS. Правила объединения файлов приведены в [документации Docker Compose](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/).
+
+### Запуск и проверка
+
+Из корня проекта выполните:
+
+```bash
+docker compose -f compose.yaml -f compose.vps.yaml config --quiet
+docker compose -f compose.yaml -f compose.vps.yaml run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker compose -f compose.yaml -f compose.vps.yaml up --build -d
+docker compose -f compose.yaml -f compose.vps.yaml ps
+docker compose -f compose.yaml -f compose.vps.yaml logs --tail=100 caddy api
+```
+
+Проверьте публичный адрес, заменив домен на свой:
+
+```bash
+curl -I http://kb.example.com/health
+curl --fail --show-error https://kb.example.com/health
+```
+
+Ожидаются перенаправление HTTP на HTTPS и ответ `{"status":"ok"}` по HTTPS с доверенным сертификатом. Откройте `https://kb.example.com/documents`, `/questions` и `/history`. Если сертификат ещё не выдан, проверьте логи Caddy, DNS, доступность портов и исходящего соединения; не отключайте проверку сертификата через `curl -k`.
+
+### Обслуживание и данные
+
+Во всех командах обслуживания на VPS указывайте оба файла: `docker compose -f compose.yaml -f compose.vps.yaml ...`. Для применения обновлённых исходников или `.env` повторите `up --build -d`; после правки Caddyfile сначала выполните `caddy validate` командой выше, затем:
+
+```bash
+docker compose -f compose.yaml -f compose.vps.yaml up -d --force-recreate caddy
+```
+
+База находится в томе `postgres_data`, сертификаты и ключи Caddy — в `caddy_data`, его служебная конфигурация — в `caddy_config`. Фактические имена томов включают имя Compose-проекта: сохраняйте каталог и имя проекта при обновлениях. Новый VPS получает новую базу; локальные документы и история автоматически не переносятся. Перед обновлениями делайте резервную копию БД и храните её вне VPS. Команда `down` сохраняет тома, а `down -v` удаляет и базу, и хранилище сертификатов.
+
 ## Экспериментальная настройка поиска
 
 Строки с `#` в `.env` — примеры: Compose их игнорирует, а приложение использует значения по умолчанию. Чтобы изменить параметр, уберите `#` в начале нужной строки и укажите число, например `VECTOR_TOP_K=8`. Затем выполните `docker compose up -d` и дождитесь ответа `http://localhost/health`. Меняйте по одному параметру за прогон, чтобы видеть его влияние.
